@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "netrunner"
+version = "1.0.0"
+description = "NETRUNNER//OS — a Cyberpunk 2077-style netrunner suite for Omarchy"
+requires-python = ">=3.11"
+dependencies = [
+    "rich>=13.0",
+    "textual>=1.0",
+    "psutil>=6.1.0",
+]
+
+[project.scripts]
+netrunner = "netrunner.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["netrunner"]

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="320" viewBox="0 0 640 320" font-family="'JetBrains Mono','Courier New',monospace">
+  <defs>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#00f0ff"/>
+      <stop offset="1" stop-color="#0097b2"/>
+    </linearGradient>
+    <linearGradient id="mag" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff2e97"/>
+      <stop offset="1" stop-color="#b2005e"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3.2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- deck frame -->
+  <rect x="0" y="0" width="640" height="320" rx="14" fill="#07090e"/>
+  <rect x="8" y="8" width="624" height="304" rx="10" fill="none" stroke="#12303a" stroke-width="2"/>
+
+  <!-- breach-protocol byte grid mark -->
+  <g transform="translate(40,70)" filter="url(#glow)">
+    <rect width="180" height="180" rx="8" fill="none" stroke="url(#cyan)" stroke-width="2.5"/>
+    <g font-size="22" font-weight="700" letter-spacing="1">
+      <text x="22"  y="42"  fill="#00f0ff">1C</text>
+      <text x="78"  y="42"  fill="#1b4a55">BD</text>
+      <text x="134" y="42"  fill="#00f0ff">55</text>
+      <text x="22"  y="86"  fill="#1b4a55">7A</text>
+      <text x="78"  y="86"  fill="#ff2e97">E9</text>
+      <text x="134" y="86"  fill="#1b4a55">1C</text>
+      <text x="22"  y="130" fill="#00f0ff">BD</text>
+      <text x="78"  y="130" fill="#1b4a55">55</text>
+      <text x="134" y="130" fill="#ffd400">FF</text>
+      <text x="22"  y="174" fill="#1b4a55">E9</text>
+      <text x="78"  y="174" fill="#00f0ff">55</text>
+      <text x="134" y="174" fill="#1b4a55">7A</text>
+    </g>
+    <!-- cursor highlight -->
+    <rect x="68" y="66" width="44" height="28" fill="none" stroke="url(#mag)" stroke-width="2.5"/>
+  </g>
+
+  <!-- wordmark -->
+  <g filter="url(#glow)">
+    <text x="252" y="150" font-size="52" font-weight="800" letter-spacing="2" fill="url(#cyan)">NETRUNNER</text>
+    <text x="256" y="196" font-size="30" font-weight="700" letter-spacing="10" fill="url(#mag)">/ / O S</text>
+  </g>
+
+  <!-- subtitle + scanline -->
+  <text x="256" y="238" font-size="13" letter-spacing="1.8" fill="#4a6a74">CYBERDECK · NETSCAN · ICE · BREACH</text>
+  <rect x="252" y="252" width="344" height="2" fill="#00f0ff" opacity="0.55"/>
+  <circle cx="600" cy="253" r="4" fill="#ff2e97"/>
+</svg>
