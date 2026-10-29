@@ -12,7 +12,7 @@ BLUE = "blue"
 DIM = "grey37"
 WHITE = "white"
 
-# Cyberpunk ICE classification tiers (low -> high threat)
+# Cyberpunk ICE classification tiers (weakest -> strongest defense; see ice.score_ice)
 ICE_TIERS = [
     ("White", "white"),
     ("Green", "green"),

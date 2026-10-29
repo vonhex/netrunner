@@ -25,7 +25,7 @@ Built for **TITAN** (Arasaka Security deck) — but runs on any Linux box with P
 |---|---|---|
 | Cyberdeck status | `dashboard` | per-core CPU, RAM, swap, disk, temps (acpitz/nvme), clock, load, uptime, GPU |
 | Net access | `netscan` | interfaces via `ip -j`, default route, DNS, nmcli, ARP table, threaded 254-host ping sweep |
-| ICE | `ice` | firewall probe (firewalld/ufw/nftables), all LISTEN sockets with owning processes, threat rating on the Cyberpunk tier scale (White → Violet) |
+| ICE | `ice` | firewall probe (firewalld/ufw/nftables), all LISTEN sockets with owning processes, ICE strength rating on the Cyberpunk tier scale (White → Violet): firewall state and network-facing listeners; loopback-only sockets don't count |
 | Daemons | `daemons` | systemd roster (system + user), failed units, top processes |
 | Data shards | `shards` | journalctl entries parsed as shards with severity colors + a personal shard vault (`~/.netrunner/shards/`) |
 | Breach Protocol | `breach` | the actual 6×8 byte-buffer minigame: faithful row tables (2/3/3+4/3+4/5/5-byte sequences), cyan data / magenta malware / yellow maelstrom bytes, cursor movement, sequence execution, completion |
@@ -52,10 +52,10 @@ netrunner kill 1234          # DOWNTIME: signal a process (pid or name, -s KILL,
 netrunner cut 10.0.1.50      # SHORT CIRCUIT: sever TCP connections to a host (--port N)
 netrunner wake aabb.ccdd.eeff  # Wake-on-LAN magic packet (--via broadcast addr)
 netrunner svc restart cups.service        # daemon control (--user for user units)
-netrunner ssh host uptime    # remote exec (BatchMode, never hangs on password)
+netrunner ssh host uptime    # remote exec (BatchMode, never hangs on password; -y to skip confirm)
 netrunner flood host -c 64   # ping flood (ping -f w/ root, -i 0.1 fallback)
 netrunner reboot -y / suspend -y          # the deck itself
-netrunner log                # audit trail of every executed quickhack
+netrunner log                # audit trail: every executed, refused or failed quickhack
 netrunner breach             # play Breach Protocol (WASD)
 netrunner breach --demo --seed 42   # watch the deck auto-play
 netrunner ask "why is my gateway unreachable?"   # one-shot EDGERUNNER query
@@ -82,10 +82,11 @@ backend is present but unreadable without privileges, ICE reports it as
 
 ## Omarchy application
 
-Ships an XDG desktop entry (`~/.local/share/applications/NETRUNNER.desktop`)
+`install.sh` adds an XDG desktop entry (`~/.local/share/applications/NETRUNNER.desktop`)
 so the deck shows up in the Omarchy app launcher and opens tiled in a terminal
 via `xdg-terminal-exec --app-id=TUI.tile`, with its own icon
-(`~/.local/share/icons/hicolor/scalable/apps/netrunner.svg`).
+(`~/.local/share/icons/hicolor/scalable/apps/netrunner.svg`). Without
+`xdg-terminal-exec` it falls back to a standard terminal launcher.
 
 ## EDGERUNNER — the AI fixer
 
@@ -127,17 +128,21 @@ Design rules followed:
 ## Install
 
 ```bash
-cd ~/Work/netrunner
-uv venv .venv --python 3.14
-uv pip install --python .venv/bin/python -e .
-ln -sf ~/.local/bin/netrunner ~/Work/netrunner/.venv/bin/netrunner   # or add .venv/bin to PATH
+git clone https://github.com/vonhex/netrunner.git ~/Work/netrunner
+~/Work/netrunner/install.sh
 ```
+
+`install.sh` creates `.venv` (with `uv` if you have it, else `python3 -m venv`), links
+`~/.local/bin/netrunner`, and adds the launcher and icon. Run it again after `git pull` to update.
+Needs Python 3.11+.
 
 ## Tests
 
 ```bash
-.venv/bin/python tests/smoke_test.py
+.venv/bin/python -m unittest discover -s tests -p "test_*.py"   # regression tests, pure logic
+.venv/bin/python tests/smoke_test.py                               # headless TUI + breach engine
 ```
-Headless Textual test (`app.run_test`): mounts all 7 tabs, switches between them,
-drives the breach game with simulated arrow keys. Plus 5 seeded engine round-trips
-(generate → complete → render).
+The regression tests need no root or network. The smoke test (`app.run_test`) mounts all
+8 tabs, switches between them, drives the breach game with simulated arrow keys, and runs
+5 seeded engine round-trips (generate → complete → render). Both run on every push and pull
+request via GitHub Actions.

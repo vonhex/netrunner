@@ -77,19 +77,34 @@ def top_processes(n: int = 12) -> list[tuple[int, str, float, str]]:
     return rows[:n]
 
 
+def parse_gpus(out: str) -> list[str]:
+    """One summary per line of nvidia-smi CSV output (one line per GPU)."""
+    gpus = []
+    for line in out.strip().splitlines():
+        parts = [x.strip() for x in line.split(",")]
+        if len(parts) != 4:
+            continue
+        name, util, mu, mt = parts
+        try:
+            gpus.append(f"{name} — {util}% · {_gb(int(mu) * 2**20)}/{_gb(int(mt) * 2**20)}")
+        except ValueError:  # "[N/A]" on some cards
+            gpus.append(f"{name} — {util}%")
+    return gpus
+
+
 def gpu() -> str | None:
-    """NVIDIA GPU summary if nvidia-smi is present."""
+    """NVIDIA GPU summary (all cards) if nvidia-smi is present."""
     if not shutil.which("nvidia-smi"):
         return None
-    out = subprocess.run(
-        ["nvidia-smi", "--query-gpu=name,utilization.gpu,memory.used,memory.total",
-         "--format=csv,noheader,nounits"],
-        capture_output=True, text=True, timeout=5,
-    ).stdout.strip()
-    if not out:
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name,utilization.gpu,memory.used,memory.total",
+             "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=5,
+        ).stdout
+    except (OSError, subprocess.TimeoutExpired):
         return None
-    name, util, mu, mt = [x.strip() for x in out.split(",")]
-    return f"{name} — {util}% · {_gb(int(mu) * 2**20)}/{_gb(int(mt) * 2**20)}"
+    return "\n".join(parse_gpus(out)) or None
 
 
 def build():

@@ -102,7 +102,7 @@ def build(n: int = 25):
         line.append(f"{s['source']}: ", style=palette.MAGENTA)
         line.append(f"{s['message']}\n")
         t.append_text(line)
-    panels = [Panel(t or Text("[grey37]no shards recovered[/]"),
+    panels = [Panel(t if t.plain else Text("no shards recovered", style=palette.DIM),
                     title="[magenta]DATA SHARDS — NET FEED[/]", border_style=palette.MAGENTA)]
 
     vault = list_shards()

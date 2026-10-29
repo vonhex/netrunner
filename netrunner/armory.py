@@ -117,6 +117,16 @@ def confirm(question: str, assume_yes: bool = False) -> None:
 
 # ---------------------------------------------------------------- weapons
 
+def parse_signal(sig: str) -> tuple[int, str]:
+    """'9', 'KILL', 'sigkill' → (9, 'SIGKILL')."""
+    s = sig.strip().upper()
+    try:
+        signum = int(s) if s.isdigit() else signal_mod.Signals[s if s.startswith("SIG") else f"SIG{s}"].value
+        return signum, signal_mod.Signals(signum).name
+    except (KeyError, ValueError):
+        raise ActionError(f"unknown signal {sig!r}") from None
+
+
 def kill(target: str, sig: str = "TERM", force: bool = False,
          assume_yes: bool = False) -> str:
     """DOWNTIME — signal a process by PID or name."""
@@ -128,10 +138,16 @@ def kill(target: str, sig: str = "TERM", force: bool = False,
     else:
         exact = [p for p in psutil.process_iter(["name"])
                  if (p.info.get("name") or "").lower() == target.lower()]
-        procs = exact or [p for p in psutil.process_iter(["name"])
-                          if target.lower() in (p.info.get("name") or "").lower()]
+        partial = [p for p in psutil.process_iter(["name"])
+                   if target.lower() in (p.info.get("name") or "").lower()]
+        procs = exact or partial
         if not procs:
             raise ActionError(f"no process matches name {target!r}")
+        if not exact and not force:
+            # "kill ssh" would also hit sshd: partial matches need an explicit --force
+            found = ", ".join(sorted({p.info.get('name') or '?' for p in partial})[:8])
+            raise ActionError(f"no process is named exactly {target!r}; partial matches: {found} "
+                              f"— use the exact name, a pid, or --force")
     protected = {0, 1, os.getpid(), os.getppid()}
     if not force:
         blocked = [p for p in procs if p.pid in protected]
@@ -139,12 +155,7 @@ def kill(target: str, sig: str = "TERM", force: bool = False,
             raise ActionError(
                 f"refusing to signal protected process "
                 f"{blocked[0].pid}:{blocked[0].name()} (init/self — use --force)")
-    try:
-        signame = sig.upper() if sig.upper().startswith("SIG") else f"SIG{sig.upper()}"
-        signum = signal_mod.Signals[signame].value if not signame.isdigit() else int(signame)
-        signame = signal_mod.Signals(signum).name
-    except (KeyError, ValueError):
-        raise ActionError(f"unknown signal {sig!r}") from None
+    signum, signame = parse_signal(sig)
     names = ", ".join(f"{p.pid}:{p.name()}" for p in procs[:5])
     more = f" (+{len(procs) - 5})" if len(procs) > 5 else ""
     confirm(f"send {signame} to {len(procs)} process(es): {names}{more}", assume_yes)
@@ -162,14 +173,11 @@ def kill(target: str, sig: str = "TERM", force: bool = False,
 
 def cut(host: str, port: int | None = None, assume_yes: bool = False) -> str:
     """SHORT CIRCUIT — kill established TCP connections to a host (ss -K)."""
-    from .netinfo import dns_lookup
-    ip = host
-    if not re.match(r"^\d+\.\d+\.\d+\.\d+$", host):
-        recs = dns_lookup(host).get("records") or []
-        v4 = [r for r in recs if ":" not in r]
-        if not v4:
-            raise ActionError(f"cannot resolve {host!r}")
-        ip = v4[0]
+    from .netinfo import dns_lookup, ip_records
+    ips = ip_records([host]) or ip_records(dns_lookup(host).get("records") or [])
+    if not ips:
+        raise ActionError(f"cannot resolve {host!r}")
+    ip = next((a for a in ips if ":" not in a), ips[0])  # prefer IPv4, fall back to IPv6
     try:
         conns = [c for c in psutil.net_connections(kind="inet")
                  if c.status == psutil.CONN_ESTABLISHED and c.raddr]
@@ -228,18 +236,21 @@ def service(action: str, unit: str, user: bool = False,
     return msg
 
 
-def remote_exec(host: str, command: str, timeout: int = 60) -> str:
+def remote_exec(host: str, command: str, timeout: int = 60, assume_yes: bool = False) -> str:
     """REMOTE EXEC — run a command on another deck over ssh (BatchMode)."""
     if not shutil.which("ssh"):
         raise ActionError("ssh not installed")
+    if host.startswith("-"):  # would be read as an ssh option, e.g. -oProxyCommand=...
+        raise ActionError(f"invalid host {host!r}")
+    confirm(f"run {command!r} on {host}", assume_yes)
     rc, out, err = _run(
-        ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", host, command],
+        ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "--", host, command],
         timeout=timeout)
     if rc != 0:
         raise ActionError(f"ssh {host} {command!r}: rc={rc} {(err or out)[:200]}")
-    msg = f"ssh {host} {command!r}: {out[:200] or '(no output)'}"
-    log_action("ssh", host, msg)
-    return msg
+    # the log records what ran, not the remote output (it can contain secrets)
+    log_action("ssh", host, f"{command!r}: ok, {len(out)} bytes of output")
+    return f"ssh {host} {command!r}:\n{out or '(no output)'}"
 
 
 def flood(host: str, count: int = 64, assume_yes: bool = False) -> str:
@@ -292,7 +303,7 @@ ARSENAL = [
     ("Short Circuit",  "netrunner cut <host> [--port N] [-y]",     "kill TCP sockets via ss -K"),
     ("Wake on LAN",    "netrunner wake <mac> [--via ip]",          "UDP magic packet"),
     ("Daemon Control", "netrunner svc <verb> <unit> [--user] [-y]", "systemctl start/stop/restart/…"),
-    ("Remote Exec",    "netrunner ssh <host> <cmd>",               "execute on another deck"),
+    ("Remote Exec",    "netrunner ssh <host> <cmd> [-y]",          "execute on another deck"),
     ("Ping Flood",     "netrunner flood <host> [-c N] [-y]",       "ICMP load"),
     ("Remote Reboot",  "netrunner reboot [-y] / suspend [-y]",     "the deck itself"),
 ]

@@ -1,8 +1,9 @@
 """Headless smoke test of the Textual app + breach engine."""
 import asyncio
 import sys
+from pathlib import Path
 
-sys.path.insert(0, "/home/administrator/Work/netrunner")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from netrunner.breach import BreachProtocol, WIDTH, HEIGHT, SPECS
 from netrunner.ui import NetrunnerOS, BreachPane, TabbedContent
@@ -58,9 +59,10 @@ async def test_tui():
         # new protocol + quit binding exist
         await pilot.press("n")
         await pilot.pause(0.2)
-    print("tui: all 8 tabs rendered, arrow-key breach works, quit OK")
+    print("tui: all 8 tabs switched, arrow-key breach works, quit OK")
 
 
-asyncio.run(test_tui())
-test_engine()
-print("ALL TESTS PASS")
+if __name__ == "__main__":
+    asyncio.run(test_tui())
+    test_engine()
+    print("ALL TESTS PASS")

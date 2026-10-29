@@ -142,14 +142,18 @@ def _hack(console: Console, kind: str, target: str, ports: str | None) -> None:
                             border_style=palette.MAGENTA))
 
 
-def _execute(console: Console, name: str, fn) -> None:
-    """Run an armory action; render the outcome and exit non-zero on failure."""
+def _execute(console: Console, name: str, fn, target: str = "") -> None:
+    """Run an armory action; render the outcome and exit non-zero on failure.
+
+    Refused and failed actions are logged too, so the action log is a complete record.
+    """
     from rich.text import Text
 
     from . import armory
     try:
         result = fn()
     except armory.ActionError as exc:
+        armory.log_action(name, target or "-", f"NOT EXECUTED: {exc}")
         console.print(Panel(Text(str(exc), style=palette.RED),
                             title=f"[{palette.RED}]{name.upper()}[/]",
                             border_style=palette.RED))
@@ -225,6 +229,7 @@ def main(argv: list[str] | None = None) -> None:
     ss = sub.add_parser("ssh", help="REMOTE EXEC — run a command on another deck")
     ss.add_argument("host")
     ss.add_argument("command", nargs="+")
+    ss.add_argument("-y", "--yes", action="store_true")
     fl = sub.add_parser("flood", help="PING FLOOD — ICMP load on a host")
     fl.add_argument("host")
     fl.add_argument("-c", type=int, default=64)
@@ -287,33 +292,33 @@ def main(argv: list[str] | None = None) -> None:
     elif cmd == "kill":
         _execute(console, "kill",
                  lambda: __import__("netrunner.armory", fromlist=["kill"]).kill(
-                     args.target, args.signal, args.force, args.yes))
+                     args.target, args.signal, args.force, args.yes), args.target)
     elif cmd == "cut":
         _execute(console, "cut",
                  lambda: __import__("netrunner.armory", fromlist=["cut"]).cut(
-                     args.host, args.port, args.yes))
+                     args.host, args.port, args.yes), args.host)
     elif cmd == "wake":
         _execute(console, "wake",
                  lambda: __import__("netrunner.armory", fromlist=["wake"]).wake(
-                     args.mac, args.via))
+                     args.mac, args.via), args.mac)
     elif cmd == "svc":
         _execute(console, "svc",
                  lambda: __import__("netrunner.armory", fromlist=["service"]).service(
-                     args.action, args.unit, args.user, args.yes))
+                     args.action, args.unit, args.user, args.yes), args.unit)
     elif cmd == "ssh":
         _execute(console, "ssh",
                  lambda: __import__("netrunner.armory", fromlist=["remote_exec"]).remote_exec(
-                     args.host, " ".join(args.command)))
+                     args.host, " ".join(args.command), assume_yes=args.yes), args.host)
     elif cmd == "flood":
         _execute(console, "flood",
                  lambda: __import__("netrunner.armory", fromlist=["flood"]).flood(
-                     args.host, args.c, args.yes))
+                     args.host, args.c, args.yes), args.host)
     elif cmd == "reboot":
         _execute(console, "reboot",
-                 lambda: __import__("netrunner.armory", fromlist=["deck_reboot"]).deck_reboot(args.yes))
+                 lambda: __import__("netrunner.armory", fromlist=["deck_reboot"]).deck_reboot(args.yes), "deck")
     elif cmd == "suspend":
         _execute(console, "suspend",
-                 lambda: __import__("netrunner.armory", fromlist=["deck_suspend"]).deck_suspend(args.yes))
+                 lambda: __import__("netrunner.armory", fromlist=["deck_suspend"]).deck_suspend(args.yes), "deck")
     elif cmd == "log":
         console.print(__import__("netrunner.armory", fromlist=["build_log"]).build_log(args.n))
     elif cmd == "breach":

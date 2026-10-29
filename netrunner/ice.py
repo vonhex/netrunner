@@ -111,56 +111,68 @@ def listening_sockets() -> list[dict]:
     return rows
 
 
-def assess() -> tuple[str, str, list[str]]:
-    """Rate ICE tier from live findings. Returns (tier, style, findings)."""
-    fw_name, fw_state, _ = firewall()
-    sockets = listening_sockets()
+LOOPBACK = ("127.", "::1")
+
+
+def exposed(sockets: list[dict]) -> list[dict]:
+    """Listening sockets reachable from the network (not bound to loopback only)."""
+    return [s for s in sockets if not s["addr"].startswith(LOOPBACK)]
+
+
+def score_ice(fw_state: str, n_exposed: int) -> int:
+    """Defense score 0..9: higher = stronger ICE. Only things that change exposure count."""
+    score = {"ACTIVE": 5, "UNKNOWN": 3}.get(fw_state, 0)   # firewall up is the big one
+    if n_exposed == 0:
+        score += 4      # nothing listening on the network at all
+    elif n_exposed <= 3:
+        score += 2
+    elif n_exposed <= 8:
+        score += 1      # more open doors = weaker ICE, never stronger
+    return min(score, len(ICE_TIERS) - 1)
+
+
+def assess(fw: tuple[str, str, str] | None = None,
+           sockets: list[dict] | None = None) -> tuple[str, str, list[str]]:
+    """Rate ICE strength from live findings. Returns (tier, style, findings)."""
+    fw_name, fw_state, _ = fw or firewall()
+    sockets = listening_sockets() if sockets is None else sockets
+    open_doors = exposed(sockets)
     findings = []
-    score = 0
 
     if fw_state == "ACTIVE":
-        score += 3
         findings.append(f"[green]{fw_name} active[/] — perimeter ICE deployed")
     elif fw_state == "UNKNOWN":
-        score += 1
         findings.append(f"[yellow]{fw_name} installed, status needs root[/] — ICE presumed present")
     elif fw_name != "none":
         findings.append(f"[yellow]{fw_name} installed but inactive[/] — ICE offline")
     else:
         findings.append("[red]no firewall detected[/] — zero ICE on this node")
 
+    n = len(open_doors)
+    if n == 0:
+        findings.append("[green]no network-facing listeners[/] — nothing to breach from the net")
+    else:
+        style = "yellow" if n > 8 else "cyan"
+        ports = ", ".join(sorted({s["addr"].rsplit(":", 1)[-1] for s in open_doors}, key=int)[:10])
+        findings.append(f"[{style}]{n} network-facing listener(s)[/] — open ports {ports}")
+    if len(sockets) > n:
+        findings.append(f"[{palette.DIM}]{len(sockets) - n} loopback-only listener(s) — not reachable from the net[/]")
+
+    # informational only: these don't change the rating
     try:
         procs = {(p.info.get("name") or "").lower() for p in psutil.process_iter(["name"])}
     except (psutil.AccessDenied, OSError):
         procs = set()
     if "sshd" in procs:
-        score += 2
-        findings.append("[green]sshd running[/] — remote access channel guarded")
-    if "hyprland" in procs:
-        score += 1
-        findings.append("[green]hyprland session active[/] — local console locked to operator")
-
-    n = len(sockets)
-    if n > 10:
-        score += 2
-        findings.append(f"[yellow]{n} listening sockets[/] — large attack surface")
-    elif n > 4:
-        score += 1
-        findings.append(f"[cyan]{n} listening sockets[/] — moderate attack surface")
-    else:
-        score += 2
-        findings.append(f"[green]{n} listening sockets[/] — minimal attack surface")
-
+        findings.append("[cyan]sshd running[/] — remote access is open: keep it key-only")
     try:
-        est = len(psutil.net_connections(kind="inet")) - n
+        est = sum(1 for c in psutil.net_connections(kind="inet") if c.status == psutil.CONN_ESTABLISHED)
     except (psutil.AccessDenied, OSError):
         est = 0
     if est > 25:
-        score += 1
         findings.append(f"[magenta]{est} established connections[/] — heavy net traffic")
 
-    tier_idx = min(score, len(ICE_TIERS) - 1)
-    tier, style = ICE_TIERS[tier_idx]
+    tier, style = ICE_TIERS[score_ice(fw_state, n)]
     return tier, style, findings
 
 
@@ -171,17 +183,19 @@ def build():
     from rich.table import Table
     from rich.text import Text
 
-    tier, style, findings = assess()
+    fw = firewall()  # probe once per refresh (it may shell out to sudo)
+    sockets = listening_sockets()
+    tier, style, findings = assess(fw, sockets)
     body = Text.from_markup(
         f"ICE CLASSIFICATION: [{style} bold]{tier.upper()}[/]\n"
         + "\n".join(f"  {f}" for f in findings)
     )
     panels = [Panel(body, title="[magenta]ICE ANALYSIS[/]", border_style=style)]
 
-    fw_name, fw_state, details = firewall()
+    fw_name, fw_state, details = fw
     if details:
         panels.append(Panel(
-            details[:2000],
+            Text(details[:2000]),  # raw tool output: never parse it as markup
             title=f"[bright_cyan]{fw_name.upper()} STATUS[/]",
             border_style=palette.CYAN))
 
@@ -190,7 +204,7 @@ def build():
     t.add_column("LOCAL ADDRESS", style=palette.WHITE)
     t.add_column("PID", style=palette.DIM, justify="right")
     t.add_column("PROCESS", style=palette.MAGENTA)
-    for s in listening_sockets():
+    for s in sockets:
         t.add_row(s["proto"], s["addr"], str(s["pid"]), s["process"])
     panels.append(Panel(t, title="[bright_cyan]LISTENING SOCKETS — ICE LAYERS[/]",
                         border_style=palette.CYAN))
