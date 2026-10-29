@@ -78,7 +78,7 @@ def interfaces() -> list[dict]:
             if a.get("family") == "inet":
                 addrs.append(f"{a.get('local', a.get('address'))}/{a.get('prefixlen', '')}")
             elif a.get("family") == "inet6" and not a.get("scope", "").startswith("link"):
-                addrs.append(f"{a.get('local', a.get('address'))}/64")
+                addrs.append(f"{a.get('local', a.get('address'))}/{a.get('prefixlen', 64)}")
         result.append({
             "name": e.get("ifname", "?"),
             "state": e.get("operstate", "UNKNOWN").upper(),
@@ -166,7 +166,12 @@ def ping(host: str, count: int = 4) -> dict:
 
 
 def _ping_one(ip: str) -> tuple[str, bool]:
-    return ip, bool(_run(["ping", "-c", "1", "-W", "1", ip], timeout=3))
+    # ping prints a header even when nothing answers, so judge by the exit code (0 = got a reply)
+    try:
+        r = subprocess.run(["ping", "-c", "1", "-W", "1", ip], capture_output=True, timeout=3)
+        return ip, r.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return ip, False
 
 
 def ping_sweep(subnet: str | None = None, workers: int = 64) -> list[str]:
@@ -203,6 +208,18 @@ def scan_subnet(subnet: str | None = None) -> dict:
 
 def traceroute(host: str, max_hops: int = 15) -> list[str]:
     return _run(["traceroute", "-m", str(max_hops), "-w", "2", host], timeout=60).splitlines()
+
+
+def ip_records(records: list[str]) -> list[str]:
+    """Only the IP addresses from DNS records (`dig +short` also lists CNAME targets)."""
+    import ipaddress
+    out = []
+    for r in records:
+        try:
+            out.append(str(ipaddress.ip_address(r.strip())))
+        except ValueError:
+            continue
+    return out
 
 
 def dns_lookup(host: str) -> dict:

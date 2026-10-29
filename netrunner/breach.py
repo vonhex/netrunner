@@ -9,7 +9,10 @@ Row layout follows the game's protocol tables:
   row 0: one 2-byte + one 3-byte sequence
   row 1: one 3-byte sequence
   rows 2-3: one 3-byte + one 4-byte sequence
-  rows 4-5: one 4-byte + one 5-byte sequence
+  rows 4-5: one 5-byte sequence
+
+Junk bytes between sequences are mostly data, with the odd stray maelstrom byte
+(yellow) that costs integrity when stepped on.
 
 The netrunner moves the cursor one byte at a time (WASD / arrows). Stepping
 onto an undownloaded sequence executes the whole sequence. Breach completes
@@ -134,7 +137,7 @@ class BreachProtocol:
                 v = f"{self.rng.randrange(256):02X}"
                 while v in forbidden:
                     v = f"{self.rng.randrange(256):02X}"
-                row_cells[c] = Cell(v, "C")
+                row_cells[c] = Cell(v, "Y" if self.rng.random() < 0.1 else "C")  # ~1 in 10 is maelstrom
             self.grid.append(row_cells)  # type: ignore[arg-type]
 
     # ------------------------------------------------------------- gameplay

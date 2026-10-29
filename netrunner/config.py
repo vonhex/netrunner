@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import socket
 import tomllib
@@ -18,7 +19,7 @@ DEFAULTS = {
     "accent": "cyan",
     # EDGERUNNER — local Halogen/OpenAI-compatible assistant endpoint.
     "edgerunner_name": "EDGERUNNER",   # what the operator calls their fixer
-    "edgerunner_url": "http://10.0.1.103:8731",
+    "edgerunner_url": "http://localhost:8080",
     "edgerunner_model": "",    # blank = auto-detect from /v1/models
 }
 
@@ -26,8 +27,11 @@ DEFAULTS = {
 def load() -> dict:
     cfg = dict(DEFAULTS)
     if CONFIG_FILE.exists():
-        with open(CONFIG_FILE, "rb") as f:
-            cfg.update(tomllib.load(f).get("netrunner", {}))
+        try:
+            with open(CONFIG_FILE, "rb") as f:
+                cfg.update(tomllib.load(f).get("netrunner", {}))
+        except (tomllib.TOMLDecodeError, OSError):
+            pass  # a damaged profile must never brick the deck: fall back to defaults
     if not cfg["operator"]:
         cfg["operator"] = (os.environ.get("USER") or "V").capitalize()
     if not cfg["deck"]:
@@ -37,7 +41,8 @@ def load() -> dict:
 
 def save(cfg: dict) -> Path:
     ensure_dirs()
-    body = "\n".join(f'{k} = "{v}"' for k, v in cfg.items())
+    # json.dumps escapes quotes and backslashes; JSON strings are valid TOML basic strings
+    body = "\n".join(f"{k} = {json.dumps(str(v), ensure_ascii=False)}" for k, v in cfg.items())
     CONFIG_FILE.write_text(f"[netrunner]\n{body}\n")
     return CONFIG_FILE
 

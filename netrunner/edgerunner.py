@@ -1,7 +1,7 @@
 """EDGERUNNER — the deck's AI fixer.
 
 A netrunning assistant backed by a local Halogen / OpenAI-compatible
-inference server (default: the operator's own box at 10.0.1.103:8731). It
+inference server (default: http://localhost:8080; set yours with `config --fixer-url`). It
 answers networking, Linux and Omarchy questions and helps the operator read
 NETRUNNER//OS's own telemetry — never a cloud service, all on the LAN.
 
@@ -41,7 +41,7 @@ class EdgerunnerError(RuntimeError):
 def _base_url() -> str:
     cfg = load()
     return (os.environ.get("NETRUNNER_EDGERUNNER_URL")
-            or cfg.get("edgerunner_url") or "http://10.0.1.103:8731").rstrip("/")
+            or cfg.get("edgerunner_url") or "http://localhost:8080").rstrip("/")
 
 
 def fixer_name() -> str:

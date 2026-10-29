@@ -19,19 +19,37 @@ from .breach import BreachProtocol
 
 
 class AutoRefresh(Static):
-    """Static widget that rebuilds its content on a timer."""
+    """Static widget that rebuilds its content on a timer — only while its tab is visible.
+
+    Building runs in a worker thread (probes shell out to systemctl, journalctl, sudo -n…),
+    so a slow probe never freezes the TUI, and hidden tabs cost nothing.
+    """
 
     INTERVAL = 5.0
 
     def on_mount(self) -> None:
+        self.update(Text("jacking in…", style=palette.DIM))
         self.refresh_view()
         self.set_interval(self.INTERVAL, self.refresh_view)
 
-    def refresh_view(self) -> None:
+    def is_visible_tab(self) -> bool:
+        pane = next((a for a in self.ancestors if isinstance(a, TabPane)), None)
         try:
-            self.update(self.build_view())
+            return pane is None or self.app.query_one(TabbedContent).active == pane.id
+        except Exception:  # noqa: BLE001 — during startup/shutdown
+            return False
+
+    def refresh_view(self) -> None:
+        if self.is_visible_tab():
+            self._build_in_background()
+
+    @work(thread=True, exclusive=True, group="refresh")
+    def _build_in_background(self) -> None:
+        try:
+            view = self.build_view()
         except Exception as exc:  # keep the app alive on data glitches
-            self.update(Text(f"render error: {exc}", style="red"))
+            view = Text(f"render error: {exc}", style="red")
+        self.app.call_from_thread(self.update, view)
 
     def build_view(self):
         raise NotImplementedError
@@ -225,6 +243,11 @@ class NetrunnerOS(App):
 
     def action_show_tab(self, tab_id: str) -> None:
         self.query_one(TabbedContent).active = tab_id
+
+    def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        # hidden tabs don't refresh, so bring the newly shown one up to date straight away
+        for pane in event.pane.query(AutoRefresh):
+            pane.refresh_view()
 
     def action_move(self, direction: str) -> None:
         if self.query_one(TabbedContent).active == "breach":
