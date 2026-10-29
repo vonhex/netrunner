@@ -19,7 +19,7 @@ DEFAULTS = {
     "accent": "cyan",
     # EDGERUNNER — local Halogen/OpenAI-compatible assistant endpoint.
     "edgerunner_name": "EDGERUNNER",   # what the operator calls their fixer
-    "edgerunner_url": "http://10.0.1.103:8731",
+    "edgerunner_url": "http://localhost:8080",
     "edgerunner_model": "",    # blank = auto-detect from /v1/models
 }
 

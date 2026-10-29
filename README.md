@@ -49,7 +49,7 @@ netrunner hack ping 1.1.1.1  # quickhacks: ping | trace | dns | ports | http
 netrunner hack ports host --ports 22,80,443
 # ARMORY — the damage half (all actions need -y/--yes and land in the action log)
 netrunner kill 1234          # DOWNTIME: signal a process (pid or name, -s KILL, -f)
-netrunner cut 10.0.1.50      # SHORT CIRCUIT: sever TCP connections to a host (--port N)
+netrunner cut 192.168.1.50   # SHORT CIRCUIT: sever TCP connections to a host (--port N)
 netrunner wake aabb.ccdd.eeff  # Wake-on-LAN magic packet (--via broadcast addr)
 netrunner svc restart cups.service        # daemon control (--user for user units)
 netrunner ssh host uptime    # remote exec (BatchMode, never hangs on password; -y to skip confirm)
@@ -62,7 +62,7 @@ netrunner ask "why is my gateway unreachable?"   # one-shot EDGERUNNER query
 netrunner edgerunner         # interactive chat with your fixer
 netrunner config --operator V --corp ARASAKA --deck TITAN
 netrunner config --fixer "Johnny Silverhand"      # name your AI fixer
-netrunner config --fixer-url http://10.0.1.103:8731   # point it at your server
+netrunner config --fixer-url http://192.168.1.20:8080  # point it at your server
 ```
 
 ### TUI keys
@@ -91,7 +91,8 @@ via `xdg-terminal-exec --app-id=TUI.tile`, with its own icon
 ## EDGERUNNER — the AI fixer
 
 `edgerunner` / `ask` talk to a **local** OpenAI-compatible inference server
-(default `http://10.0.1.103:8731`, a Halogen box) — nothing leaves the LAN.
+(default `http://localhost:8080`; llama.cpp, LM Studio, Ollama, vLLM or Halogen all work)
+— nothing leaves the LAN.
 The model id is auto-detected from `/v1/models` (override with
 `--fixer-model`). Each query carries a compact live snapshot of the deck
 (interfaces, route, DNS, firewall state) so the fixer can reason about *your*
@@ -146,3 +147,13 @@ The regression tests need no root or network. The smoke test (`app.run_test`) mo
 8 tabs, switches between them, drives the breach game with simulated arrow keys, and runs
 5 seeded engine round-trips (generate → complete → render). Both run on every push and pull
 request via GitHub Actions.
+
+## License
+
+[PolyForm Noncommercial License 1.0.0](LICENSE). **Free to use, copy and modify for any
+non-commercial purpose**: personal use, hobby projects, research, charities, schools and public
+bodies. **Not for sale and not for commercial use**: you may not sell NETRUNNER//OS, charge for it,
+or use it in or for a paid product or service. It's provided as is, with no warranty.
+
+Only use the armory and scanning quickhacks on machines and networks you own or are allowed to
+test.

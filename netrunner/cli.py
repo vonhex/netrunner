@@ -197,7 +197,7 @@ def main(argv: list[str] | None = None) -> None:
     cfgp.add_argument("--fixer", dest="edgerunner_name",
                       help="name your AI fixer (default: EDGERUNNER)")
     cfgp.add_argument("--fixer-url", dest="edgerunner_url",
-                      help="fixer endpoint (default: http://10.0.1.103:8731)")
+                      help="fixer endpoint (default: http://localhost:8080)")
     cfgp.add_argument("--fixer-model", dest="edgerunner_model",
                       help="pin a model id (default: auto-detect)")
 
